@@ -77,6 +77,7 @@ const ARTHUR: SeedRow[] = [
   { title: 'Lease agreement signed', category: 'Deals', points: 10, done: false },
   { title: '5 new LOIs (+2 MSAs signed)', category: 'Sales', points: 10, done: false },
   { title: 'Email campaign to sellers — blast all leads/emails', category: 'Sales', points: 6, done: false },
+  { title: 'Set up LinkedIn marketing campaign (SBL)', category: 'Sales', points: 5, done: false },
   { title: 'Re-work sales script', category: 'Sales', points: 3, done: false },
   { title: 'Transmsy pipeline', category: 'Sales', points: 3, done: false },
   { title: 'Jim call', category: 'Sales', points: 1, done: false },
