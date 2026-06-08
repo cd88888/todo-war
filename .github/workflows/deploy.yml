@@ -31,12 +31,10 @@ jobs:
 
       - name: Build
         env:
-          # Anthropic key — set this in: GitHub repo → Settings → Secrets → Actions
-          VITE_ANTHROPIC_API_KEY: ${{ secrets.VITE_ANTHROPIC_API_KEY }}
-          # Supabase (add these when you set up cross-device sync)
+          # Supabase — add these later when you set up cross-device sync
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
-          # GitHub Pages serves from /<repo-name>/ — set this to match your repo name
+          # GitHub Pages serves from /<repo-name>/ — matches the repo name
           VITE_BASE_PATH: /todo-war/
         run: npm run build
 

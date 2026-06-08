@@ -1,137 +1,146 @@
-import type { GameState, PlayerId } from '../types'
+import type { GameState, PlayerId, PointsTier } from '../types'
 
-// ── Step 1: Whisper transcription (same as weekly-pulse) ─────────────────────
-
-export async function transcribeAudio(
-  audioBlob: Blob,
-  mimeType: string,
-  openAIKey: string,
-): Promise<string> {
-  const ext = mimeType.includes('mp4') ? 'mp4' : mimeType.includes('ogg') ? 'ogg' : 'webm'
-  const form = new FormData()
-  form.append('file', audioBlob, `recording.${ext}`)
-  form.append('model', 'whisper-1')
-  form.append('language', 'en')
-  form.append('response_format', 'text')
-
-  const res = await fetch('https://api.openai.com/v1/audio/transcriptions', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${openAIKey}` },
-    body: form,
-  })
-  if (!res.ok) throw new Error(`Whisper error ${res.status}: ${await res.text()}`)
-  return res.text()
-}
-
-// ── Step 2: Claude parses the transcript into structured intents ──────────────
+// ── Intent types ─────────────────────────────────────────────────────────────
 
 export type VoiceAction =
   | { type: 'complete'; taskId: string; taskTitle: string }
   | { type: 'reopen'; taskId: string; taskTitle: string }
-  | { type: 'add'; title: string; category: string; points: 1 | 3 | 5 | 10; owner: PlayerId }
+  | { type: 'add'; title: string; category: string; points: PointsTier; owner: PlayerId }
   | { type: 'unknown'; transcript: string }
 
-function buildSystemPrompt(state: GameState, currentPlayer: PlayerId | null): string {
-  const openTasks = state.tasks
-    .filter((t) => t.status === 'open')
-    .map((t) => `  - id:${t.id} | "${t.title}" | ${t.category} | ${t.points}pts | owner:${t.owner}`)
-    .join('\n')
-  const doneTasks = state.tasks
-    .filter((t) => t.status === 'done')
-    .map((t) => `  - id:${t.id} | "${t.title}" | owner:${t.owner}`)
-    .join('\n')
+// ── Simple fuzzy match — find the closest task title ─────────────────────────
 
-  return `You are the voice command parser for TODO WAR, a competitive to-do app between Cam and Arthur.
-
-Current user speaking: ${currentPlayer ?? 'unknown (dashboard)'}
-
-OPEN TASKS:
-${openTasks || '  (none)'}
-
-RECENTLY COMPLETED TASKS:
-${doneTasks.slice(0, 800) || '  (none)'}
-
-Parse the voice transcript and return ONE JSON object with this shape:
-{
-  "action": "complete" | "reopen" | "add" | "unknown",
-  "taskId": "<id from the lists above — only for complete/reopen>",
-  "taskTitle": "<display name of the task>",
-  "title": "<new task title — only for add>",
-  "category": "<one of: Sales, Deals, Legal, Ops, Fundraising, AI / Automation, General — only for add>",
-  "points": 1 | 3 | 5 | 10,
-  "owner": "cam" | "arthur"
+function normalize(s: string): string {
+  return s.toLowerCase().replace(/[^a-z0-9 ]/g, '').trim()
 }
 
-Rules:
-- "complete" = user says they finished / done / checked off / closed / signed / crushed a task
-- "reopen" = user wants to un-complete / reopen / undo a task
-- "add" = user wants to add / create / put / track a new task
-- "unknown" = you can't confidently determine the intent
-- For complete/reopen: fuzzy-match the transcript to the closest open/done task by title (pick the best match)
-- For add: infer category and points from the nature of the task (10=major deal/milestone, 5=real work, 3=meeting/call, 1=admin)
-- Owner defaults to current user unless the user explicitly says "for Arthur" or "for Cam"
-- Return ONLY the JSON object, no commentary, no markdown fences.`
+function similarity(a: string, b: string): number {
+  const na = normalize(a)
+  const nb = normalize(b)
+  if (na === nb) return 1
+  if (na.includes(nb) || nb.includes(na)) return 0.9
+  const aWords = new Set(na.split(' ').filter(Boolean))
+  const bWords = nb.split(' ').filter(Boolean)
+  const hits = bWords.filter((w) => aWords.has(w)).length
+  return bWords.length > 0 ? hits / Math.max(aWords.size, bWords.length) : 0
 }
 
-export async function parseVoiceIntent(
+function bestMatch(
+  transcript: string,
+  tasks: GameState['tasks'],
+  statusFilter: 'open' | 'done',
+): (typeof tasks)[0] | null {
+  const candidates = tasks.filter((t) => t.status === statusFilter)
+  if (!candidates.length) return null
+
+  let best = candidates[0]
+  let bestScore = similarity(transcript, candidates[0].title)
+
+  for (const t of candidates.slice(1)) {
+    const score = similarity(transcript, t.title)
+    if (score > bestScore) {
+      bestScore = score
+      best = t
+    }
+  }
+
+  return bestScore >= 0.2 ? best : null
+}
+
+// ── Category + points inference from keywords ─────────────────────────────────
+
+function inferCategory(text: string): string {
+  const t = text.toLowerCase()
+  if (/\b(deal|msa|loi|close|kodiak|contract|agreement|purchase|lease|commitment)\b/.test(t)) return 'Deals'
+  if (/\b(sales|pitch|script|outreach|prospect|crm|salesforce|pipeline)\b/.test(t)) return 'Sales'
+  if (/\b(lawyer|legal|lawsuit|attorney|medicaid|va |compliance)\b/.test(t)) return 'Legal'
+  if (/\b(hire|onboard|recruit|dry clean|expert|staff)\b/.test(t)) return 'Ops'
+  if (/\b(raise|cap|investor|fund|investment|equity)\b/.test(t)) return 'Fundraising'
+  if (/\b(ai|claude|automat|bot|whisper|gpt|llm|workflow)\b/.test(t)) return 'AI / Automation'
+  return 'General'
+}
+
+function inferPoints(text: string): PointsTier {
+  const t = text.toLowerCase()
+  // Epic (10): major deals, milestones, fundraising closes
+  if (/\b(epic|major|huge|massive|close|signed|million|raise|acquire|acquisition)\b/.test(t)) return 10
+  // Hard (5): real work blocks
+  if (/\b(hard|big|important|plan|build|implement|negotiate|attorney|draft)\b/.test(t)) return 5
+  // Medium (3): calls, meetings, reviews
+  if (/\b(medium|call|meet|review|send|email|follow.?up|check)\b/.test(t)) return 3
+  // Quick (1): small admin
+  if (/\b(quick|easy|fast|small|admin|update|minor)\b/.test(t)) return 1
+  return 3
+}
+
+// ── Main parser — no API needed ───────────────────────────────────────────────
+
+const COMPLETE_WORDS =
+  /\b(done|finished|completed?|closed?|crushed?|nailed?|knocked? out|checked? off|signed?|wrapped?|sent|paid|filed|submitted)\b/i
+
+const REOPEN_WORDS =
+  /\b(re-?open|undo|revert|uncheck|not done|didn'?t|not finished|still open|actually)\b/i
+
+const ADD_WORDS =
+  /\b(add|create|new task|put|track|need to|gotta|have to|remember to|log)\b/i
+
+// detect "for Arthur" / "for Cam" owner override
+function detectOwner(text: string, defaultOwner: PlayerId): PlayerId {
+  if (/\bfor arthur\b/i.test(text)) return 'arthur'
+  if (/\bfor cam\b/i.test(text)) return 'cam'
+  return defaultOwner
+}
+
+// strip leading verb phrases so we extract the task title cleanly
+function stripAddVerb(text: string): string {
+  return text
+    .replace(/^(please |can you |i need to |i gotta |i want to |remember to |log |track |put |add |create |new task |need to )+/i, '')
+    .replace(/\s*(for (arthur|cam))\s*$/i, '')
+    .trim()
+}
+
+export function parseVoiceIntent(
   transcript: string,
   state: GameState,
   currentPlayer: PlayerId | null,
-  anthropicKey: string,
-): Promise<VoiceAction> {
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'x-api-key': anthropicKey,
-      'anthropic-version': '2023-06-01',
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: 'claude-haiku-4-5',
-      max_tokens: 256,
-      system: buildSystemPrompt(state, currentPlayer),
-      messages: [{ role: 'user', content: transcript }],
-    }),
-  })
-  if (!res.ok) throw new Error(`Claude error ${res.status}: ${await res.text()}`)
-  const data = (await res.json()) as { content: Array<{ type: string; text: string }> }
-  const text = data.content.find((c) => c.type === 'text')?.text ?? '{}'
+): VoiceAction {
+  const text = transcript.trim()
+  if (!text) return { type: 'unknown', transcript }
 
-  try {
-    const parsed = JSON.parse(text.trim()) as {
-      action?: string
-      taskId?: string
-      taskTitle?: string
-      title?: string
-      category?: string
-      points?: number
-      owner?: string
-    }
-    const action = parsed.action ?? 'unknown'
+  const owner: PlayerId = currentPlayer ?? 'cam'
 
-    if (action === 'complete' && parsed.taskId) {
-      return { type: 'complete', taskId: parsed.taskId, taskTitle: parsed.taskTitle ?? '' }
-    }
-    if (action === 'reopen' && parsed.taskId) {
-      return { type: 'reopen', taskId: parsed.taskId, taskTitle: parsed.taskTitle ?? '' }
-    }
-    if (action === 'add' && parsed.title) {
-      const validPoints = [1, 3, 5, 10]
-      const pts = validPoints.includes(parsed.points ?? 0) ? (parsed.points as 1 | 3 | 5 | 10) : 3
-      const owner: PlayerId =
-        parsed.owner === 'cam' || parsed.owner === 'arthur'
-          ? parsed.owner
-          : currentPlayer ?? 'cam'
-      return {
-        type: 'add',
-        title: parsed.title,
-        category: parsed.category ?? 'General',
-        points: pts,
-        owner,
-      }
-    }
-    return { type: 'unknown', transcript }
-  } catch {
-    return { type: 'unknown', transcript }
+  // ── Reopen ──────────────────────────────────────────────────────────────────
+  if (REOPEN_WORDS.test(text)) {
+    const match = bestMatch(text, state.tasks, 'done')
+    if (match) return { type: 'reopen', taskId: match.id, taskTitle: match.title }
   }
+
+  // ── Complete ─────────────────────────────────────────────────────────────────
+  if (COMPLETE_WORDS.test(text)) {
+    const match = bestMatch(text, state.tasks, 'open')
+    if (match) return { type: 'complete', taskId: match.id, taskTitle: match.title }
+    // fallback: maybe they mentioned a done task title with "done"
+    const doneMatch = bestMatch(text, state.tasks, 'done')
+    if (doneMatch) return { type: 'reopen', taskId: doneMatch.id, taskTitle: doneMatch.title }
+  }
+
+  // ── Add ──────────────────────────────────────────────────────────────────────
+  if (ADD_WORDS.test(text)) {
+    const rawTitle = stripAddVerb(text)
+    return {
+      type: 'add',
+      title: rawTitle || text,
+      category: inferCategory(rawTitle),
+      points: inferPoints(rawTitle),
+      owner: detectOwner(text, owner),
+    }
+  }
+
+  // ── Fallback: if text strongly matches an open task, complete it ─────────────
+  const fuzzy = bestMatch(text, state.tasks, 'open')
+  if (fuzzy && similarity(text, fuzzy.title) >= 0.5) {
+    return { type: 'complete', taskId: fuzzy.id, taskTitle: fuzzy.title }
+  }
+
+  return { type: 'unknown', transcript }
 }
