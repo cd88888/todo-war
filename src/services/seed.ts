@@ -17,10 +17,12 @@ interface SeedRow {
 }
 
 const CAM: SeedRow[] = [
+  // ── Whiteboard originals ──────────────────────────────────────────────────
   { title: 'NNHC Recission', category: 'Legal', points: 5, done: true, daysAgo: 9 },
   { title: 'VA Medicaid attorney', category: 'Legal', points: 3, done: true, daysAgo: 8 },
   { title: 'Locora MSA', category: 'Deals', points: 5, done: true, daysAgo: 3 },
-  { title: 'Negotiate NJ Deal', category: 'Deals', points: 10, done: false },
+  { title: 'Lawyer / lawsuit', category: 'Legal', points: 5, done: true, daysAgo: 6 },
+  { title: 'Close Illinois', category: 'Deals', points: 10, done: true, daysAgo: 2 },
   {
     title: 'VAS',
     category: 'AI / Automation',
@@ -29,15 +31,38 @@ const CAM: SeedRow[] = [
     subtasks: ['IE', 'AI Conformer'],
   },
   { title: 'Business bank account', category: 'Ops', points: 3, done: false },
-  { title: 'Lawyer / lawsuit', category: 'Legal', points: 5, done: true, daysAgo: 6 },
   { title: 'Clio / Jiri', category: 'Ops', points: 3, done: false },
-  { title: 'Close Illinois', category: 'Deals', points: 10, done: true, daysAgo: 2 },
   { title: 'Acquire van', category: 'Ops', points: 3, done: false },
   { title: 'Cap raise plan', category: 'Fundraising', points: 10, done: false },
   { title: 'AI auto with Claude', category: 'AI / Automation', points: 5, done: false },
   { title: 'Automatic / async onboarding', category: 'AI / Automation', points: 5, done: false },
   { title: 'More AI automations', category: 'AI / Automation', points: 3, done: false },
   { title: 'Add old to-dos + close-out clause', category: 'Ops', points: 1, done: false },
+  // ── New tasks (week of Jun 8) ─────────────────────────────────────────────
+  // 🔥 TOP PRIORITY
+  { title: 'Send lender all requested documents', category: 'Fundraising', points: 10, done: false, notes: 'Top priority this week — send everything the SBA lender has asked for' },
+  { title: 'Figure out debt transfer → send PFS to SBA lender', category: 'Fundraising', points: 5, done: false },
+  // Legal / Deals
+  { title: 'Negotiate NJ deal', category: 'Deals', points: 10, done: false, notes: 'Due end of next week' },
+  { title: 'Finalize MSA with directors + lawyer', category: 'Legal', points: 5, done: false },
+  { title: 'Finalize purchase agreement with directors', category: 'Legal', points: 5, done: false },
+  { title: 'Finalize lease agreement with directors', category: 'Legal', points: 5, done: false },
+  // Ops / HR
+  { title: 'Fix HR hole — hire ops person', category: 'Ops', points: 5, done: false },
+  { title: 'Fill other key hires', category: 'Ops', points: 3, done: false },
+  // Sales
+  { title: 'Fix sales team follow-ups + SOPs', category: 'Sales', points: 5, done: false },
+  { title: 'Create sales scripts', category: 'Sales', points: 3, done: false },
+  { title: 'Train sales team', category: 'Sales', points: 3, done: false },
+  { title: 'Keep sales pipeline growing', category: 'Sales', points: 3, done: false },
+  { title: 'Send Richard the sales process', category: 'Sales', points: 1, done: false },
+  // Growth / AI
+  { title: 'Max out LinkedIn connections', category: 'Sales', points: 3, done: false },
+  { title: 'Reach out to investors', category: 'Fundraising', points: 5, done: false },
+  { title: 'Build Claude auto-outreach (1k/week → meetings)', category: 'AI / Automation', points: 10, done: false },
+  // Personal
+  { title: 'Pay physical therapy', category: 'General', points: 1, done: false },
+  { title: 'Get new phone', category: 'General', points: 1, done: false, notes: 'By end of month' },
 ]
 
 const ARTHUR: SeedRow[] = [
