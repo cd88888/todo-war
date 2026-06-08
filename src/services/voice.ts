@@ -49,7 +49,7 @@ function bestMatch(
 
 // ── Category + points inference from keywords ─────────────────────────────────
 
-function inferCategory(text: string): string {
+export function inferCategory(text: string): string {
   const t = text.toLowerCase()
   if (/\b(deal|msa|loi|close|kodiak|contract|agreement|purchase|lease|commitment)\b/.test(t)) return 'Deals'
   if (/\b(sales|pitch|script|outreach|prospect|crm|salesforce|pipeline)\b/.test(t)) return 'Sales'
@@ -60,7 +60,7 @@ function inferCategory(text: string): string {
   return 'General'
 }
 
-function inferPoints(text: string): PointsTier {
+export function inferPoints(text: string): PointsTier {
   const t = text.toLowerCase()
   // Epic (10): major deals, milestones, fundraising closes
   if (/\b(epic|major|huge|massive|close|signed|million|raise|acquire|acquisition)\b/.test(t)) return 10

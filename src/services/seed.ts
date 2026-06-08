@@ -18,11 +18,11 @@ interface SeedRow {
 
 const CAM: SeedRow[] = [
   // ── Whiteboard originals ──────────────────────────────────────────────────
-  { title: 'NNHC Recission', category: 'Legal', points: 5, done: true, daysAgo: 9 },
-  { title: 'VA Medicaid attorney', category: 'Legal', points: 3, done: true, daysAgo: 8 },
-  { title: 'Locora MSA', category: 'Deals', points: 5, done: true, daysAgo: 3 },
-  { title: 'Lawyer / lawsuit', category: 'Legal', points: 5, done: true, daysAgo: 6 },
-  { title: 'Close Illinois', category: 'Deals', points: 10, done: true, daysAgo: 2 },
+  { title: 'NNHC Recission', category: 'Legal', points: 5, done: false },
+  { title: 'VA Medicaid attorney', category: 'Legal', points: 3, done: false },
+  { title: 'Locora MSA', category: 'Deals', points: 5, done: false },
+  { title: 'Lawyer / lawsuit', category: 'Legal', points: 5, done: false },
+  { title: 'Close Illinois', category: 'Deals', points: 10, done: false },
   {
     title: 'VAS',
     category: 'AI / Automation',
@@ -71,18 +71,18 @@ const ARTHUR: SeedRow[] = [
   { title: 'Purchase agreement signed', category: 'Deals', points: 10, done: false },
   { title: 'Lease agreement signed', category: 'Deals', points: 10, done: false },
   { title: '5 new LOIs (+2 MSAs signed)', category: 'Sales', points: 10, done: false },
-  { title: 'Re-work sales script', category: 'Sales', points: 3, done: true, daysAgo: 7 },
-  { title: 'Transmsy pipeline', category: 'Sales', points: 3, done: true, daysAgo: 5 },
+  { title: 'Re-work sales script', category: 'Sales', points: 3, done: false },
+  { title: 'Transmsy pipeline', category: 'Sales', points: 3, done: false },
   { title: 'Jim call', category: 'Sales', points: 1, done: false },
-  { title: 'Springfield', category: 'Deals', points: 5, done: true, daysAgo: 4 },
+  { title: 'Springfield', category: 'Deals', points: 5, done: false },
   { title: 'Pay PT', category: 'Ops', points: 1, done: false },
-  { title: 'Deal pipeline', category: 'Sales', points: 5, done: true, daysAgo: 1 },
+  { title: 'Deal pipeline', category: 'Sales', points: 5, done: false },
   { title: 'Kodiak Closing MSA', category: 'Deals', points: 10, done: false },
   { title: 'Edgar MSA', category: 'Deals', points: 5, done: false },
-  { title: 'Salesforce', category: 'Ops', points: 3, done: true, daysAgo: 6 },
+  { title: 'Salesforce', category: 'Ops', points: 3, done: false },
   { title: 'New Print', category: 'Ops', points: 1, done: false },
   { title: 'App Sales', category: 'Sales', points: 3, done: false },
-  { title: 'Send Richard salesperson spreadsheet', category: 'Sales', points: 1, done: true, daysAgo: 2 },
+  { title: 'Send Richard salesperson spreadsheet', category: 'Sales', points: 1, done: false },
 ]
 
 const DAY = 86_400_000
