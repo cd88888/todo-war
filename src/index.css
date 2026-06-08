@@ -1,0 +1,73 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+  body {
+    @apply bg-ink-900 text-slate-100 antialiased font-body;
+    background-image:
+      radial-gradient(1200px 600px at 15% -10%, rgba(0, 229, 255, 0.08), transparent 60%),
+      radial-gradient(1200px 600px at 85% 110%, rgba(255, 43, 214, 0.08), transparent 60%),
+      linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+    background-size: 100% 100%, 100% 100%, 40px 40px, 40px 40px;
+    background-attachment: fixed;
+  }
+  h1,
+  h2,
+  h3 {
+    @apply font-display tracking-wide;
+  }
+}
+
+@layer components {
+  .neon-text-cam {
+    color: #7df9ff;
+    text-shadow: 0 0 6px rgba(0, 229, 255, 0.8), 0 0 18px rgba(0, 229, 255, 0.5);
+  }
+  .neon-text-arthur {
+    color: #ff8ae9;
+    text-shadow: 0 0 6px rgba(255, 43, 214, 0.8), 0 0 18px rgba(255, 43, 214, 0.5);
+  }
+  .neon-text-win {
+    color: #aaffa0;
+    text-shadow: 0 0 6px rgba(57, 255, 20, 0.85), 0 0 18px rgba(57, 255, 20, 0.5);
+  }
+  .panel {
+    @apply bg-ink-700/70 backdrop-blur-sm rounded-2xl shadow-card border border-white/5;
+  }
+  .scanlines::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: repeating-linear-gradient(
+      to bottom,
+      rgba(255, 255, 255, 0.025) 0px,
+      rgba(255, 255, 255, 0.025) 1px,
+      transparent 2px,
+      transparent 4px
+    );
+    border-radius: inherit;
+  }
+}
+
+@layer utilities {
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: #2a2c45 transparent;
+  }
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: #2a2c45;
+    border-radius: 9999px;
+  }
+}

@@ -1,0 +1,24 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+dist-ssr/
+
+# Environment files — NEVER commit these (API keys live here)
+.env
+.env.local
+.env.*.local
+
+# Editor / OS
+.DS_Store
+*.local
+.vscode/
+.idea/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Vite
+*.tsbuildinfo
