@@ -1,25 +1,28 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Plus, Bell, BellOff, Monitor, RefreshCw, LogOut, Swords } from 'lucide-react'
+import { Plus, Bell, BellOff, Monitor, LogOut, Swords, BarChart3, ListPlus, Target } from 'lucide-react'
 import clsx from 'clsx'
 import { useGame } from '../contexts/GameContext'
 import { useNotifications } from '../hooks/useNotifications'
 import { getPermission, requestPermission } from '../services/notifications'
-import { buildSeedState } from '../services/seed'
-import { PLAYERS, opponentOf, type Period, type Task } from '../types'
+import { PLAYERS, opponentOf, type Period } from '../types'
 import IdentityGate from './IdentityGate'
 import LeaderboardTabs from './LeaderboardTabs'
 import VersusBar from './VersusBar'
 import LeaderboardChart from './LeaderboardChart'
 import TaskList from './TaskList'
 import TaskModal from './TaskModal'
+import BulkAddModal from './BulkAddModal'
+import Analytics from './Analytics'
 
 const NOTIF_KEY = 'todoWar_notif_v1'
 
 export default function PlayerApp() {
-  const { state, boards, currentPlayer, setCurrentPlayer, replaceAll } = useGame()
+  const { state, boards, currentPlayer, setCurrentPlayer } = useGame()
   const [period, setPeriod] = useState<Period>('week')
   const [side, setSide] = useState<'me' | 'rival'>('me')
-  const [modalFor, setModalFor] = useState<Task | 'new' | null>(null)
+  const [modal, setModal] = useState<null | 'new' | 'goal'>(null)
+  const [bulkOpen, setBulkOpen] = useState(false)
+  const [analyticsOpen, setAnalyticsOpen] = useState(false)
   const [notifOn, setNotifOn] = useState(() => localStorage.getItem(NOTIF_KEY) === '1')
 
   useNotifications(notifOn)
@@ -48,14 +51,10 @@ export default function PlayerApp() {
     if (perm === 'granted') { setNotifOn(true); localStorage.setItem(NOTIF_KEY, '1') }
   }
 
-  function hardReset() {
-    if (confirm('Reset the whole game back to the whiteboard import?')) replaceAll(buildSeedState())
-  }
-
   const showing = side === 'me' ? myTasks : rivalTasks
 
   return (
-    <div className="min-h-screen max-w-2xl mx-auto px-4 pb-24">
+    <div className="min-h-screen max-w-5xl mx-auto px-4 pb-28">
       {/* Header */}
       <header className="flex items-center justify-between py-4 sticky top-0 z-30 bg-ink-900/80 backdrop-blur">
         <div className="flex items-center gap-2">
@@ -65,6 +64,10 @@ export default function PlayerApp() {
           </span>
         </div>
         <div className="flex items-center gap-1">
+          <button onClick={() => setAnalyticsOpen(true)} title="Stats & history"
+            className="p-2 rounded-lg hover:bg-white/10 text-slate-300">
+            <BarChart3 size={18} />
+          </button>
           <button onClick={toggleNotifs} title={notifOn ? 'Mute alerts' : 'Enable phone alerts'}
             className={clsx('p-2 rounded-lg hover:bg-white/10', notifOn ? 'text-win' : 'text-slate-400')}>
             {notifOn ? <Bell size={18} /> : <BellOff size={18} />}
@@ -72,9 +75,6 @@ export default function PlayerApp() {
           <a href="?view=dashboard" title="Monitor dashboard" className="p-2 rounded-lg hover:bg-white/10 text-slate-300">
             <Monitor size={18} />
           </a>
-          <button onClick={hardReset} title="Reset to whiteboard" className="p-2 rounded-lg hover:bg-white/10 text-slate-400">
-            <RefreshCw size={18} />
-          </button>
           <button onClick={() => setCurrentPlayer(null)} title="Switch player"
             className="ml-1 inline-flex items-center gap-1.5 pl-2 pr-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10"
             style={{ boxShadow: `inset 0 0 0 1px ${accent}55` }}>
@@ -93,13 +93,11 @@ export default function PlayerApp() {
         </div>
         <div className="mt-2 text-center text-xs text-slate-400">
           {board.leader === null ? (
-            <span>Dead heat 0 – 0. First to check off wins the day.</span>
+            <span>Dead heat {board.cam} – {board.arthur}. First to check off wins.</span>
           ) : board.leader === me ? (
             <span className="neon-text-win">🏆 You're up by {board.margin}. Don't get comfortable.</span>
           ) : (
-            <span className="neon-text-arthur">
-              {PLAYERS[rival].name} leads by {board.margin}. Get to work.
-            </span>
+            <span className="neon-text-arthur">{PLAYERS[rival].name} leads by {board.margin}. Get to work.</span>
           )}
         </div>
         <div className="mt-3 -mx-1">
@@ -108,7 +106,7 @@ export default function PlayerApp() {
       </section>
 
       {/* Side switcher */}
-      <div className="flex gap-1 p-1 bg-ink-800 rounded-xl mb-2">
+      <div className="flex gap-1 p-1 bg-ink-800 rounded-xl mb-3">
         {(['me', 'rival'] as const).map((s) => {
           const who = s === 'me' ? me : rival
           const active = side === s
@@ -123,27 +121,32 @@ export default function PlayerApp() {
         })}
       </div>
 
-      <TaskList tasks={showing} owner={side === 'me' ? me : rival} editable={side === 'me'} onEdit={(t) => setModalFor(t)} />
+      <TaskList tasks={showing} owner={side === 'me' ? me : rival} editable={side === 'me'} />
 
-      {/* FAB — Add task (only on my side) */}
+      {/* Action buttons (only on my side) */}
       {side === 'me' && (
-        <button
-          onClick={() => setModalFor('new')}
-          className="fixed bottom-6 right-4 z-30 flex items-center gap-2 px-4 py-3 rounded-xl font-display font-bold text-sm text-ink-900 active:scale-95 transition"
-          style={{ background: accent, boxShadow: `0 0 20px ${accent}99` }}
-        >
-          <Plus size={18} strokeWidth={3} />
-          Add task
-        </button>
+        <div className="fixed bottom-5 right-4 z-30 flex items-center gap-2">
+          <button onClick={() => setModal('goal')} title="New goal"
+            className="flex items-center justify-center w-11 h-11 rounded-xl bg-ink-700 hover:bg-ink-600 text-gold border border-gold/40 active:scale-95 transition">
+            <Target size={18} />
+          </button>
+          <button onClick={() => setBulkOpen(true)} title="Bulk add"
+            className="flex items-center justify-center w-11 h-11 rounded-xl bg-ink-700 hover:bg-ink-600 text-slate-200 active:scale-95 transition">
+            <ListPlus size={18} />
+          </button>
+          <button onClick={() => setModal('new')}
+            className="flex items-center gap-2 px-4 py-3 rounded-xl font-display font-bold text-sm text-ink-900 active:scale-95 transition"
+            style={{ background: accent, boxShadow: `0 0 20px ${accent}99` }}>
+            <Plus size={18} strokeWidth={3} /> Add task
+          </button>
+        </div>
       )}
 
-      {modalFor && (
-        <TaskModal
-          owner={me}
-          existing={modalFor === 'new' ? undefined : modalFor}
-          onClose={() => setModalFor(null)}
-        />
+      {modal && (
+        <TaskModal owner={me} defaultGoal={modal === 'goal'} onClose={() => setModal(null)} />
       )}
+      {bulkOpen && <BulkAddModal owner={me} onClose={() => setBulkOpen(false)} />}
+      {analyticsOpen && <Analytics onClose={() => setAnalyticsOpen(false)} />}
     </div>
   )
 }

@@ -10,11 +10,11 @@ export type VoiceAction =
 
 // ── Simple fuzzy match — find the closest task title ─────────────────────────
 
-function normalize(s: string): string {
+export function normalize(s: string): string {
   return s.toLowerCase().replace(/[^a-z0-9 ]/g, '').trim()
 }
 
-function similarity(a: string, b: string): number {
+export function similarity(a: string, b: string): number {
   const na = normalize(a)
   const nb = normalize(b)
   if (na === nb) return 1
@@ -62,14 +62,18 @@ export function inferCategory(text: string): string {
 
 export function inferPoints(text: string): PointsTier {
   const t = text.toLowerCase()
-  // Epic (10): major deals, milestones, fundraising closes
-  if (/\b(epic|major|huge|massive|close|signed|million|raise|acquire|acquisition)\b/.test(t)) return 10
-  // Hard (5): real work blocks
-  if (/\b(hard|big|important|plan|build|implement|negotiate|attorney|draft)\b/.test(t)) return 5
-  // Medium (3): calls, meetings, reviews
-  if (/\b(medium|call|meet|review|send|email|follow.?up|check)\b/.test(t)) return 3
-  // Quick (1): small admin
-  if (/\b(quick|easy|fast|small|admin|update|minor)\b/.test(t)) return 1
+  // 10 — Epic: company-moving
+  if (/\b(epic|company.?moving|acquire|acquisition|merger|raise|fundrais|seed round|series [a-c])\b/.test(t)) return 10
+  // 8–9 — Major/Huge: closes something meaningful, big $
+  if (/\b(close|closing|signed|sign|million|msa|loi|deal|contract|purchase agreement|lease agreement|commitment)\b/.test(t)) return 8
+  // 7 — Heavy: multi-day, coordination
+  if (/\b(negotiate|implement|migrate|launch|onboard|hire|recruit|campaign)\b/.test(t)) return 7
+  // 5–6 — Solid/Hard: real work, key calls
+  if (/\b(build|create|draft|plan|write|design|train|attorney|lawyer|important|big)\b/.test(t)) return 5
+  // 3–4 — Small/Moderate: meetings, reviews
+  if (/\b(call|meet|review|follow.?up|prep|research|check in)\b/.test(t)) return 3
+  // 1–2 — Trivial/Quick: admin
+  if (/\b(quick|easy|fast|small|admin|update|minor|pay|send|email|reply|file|submit)\b/.test(t)) return 2
   return 3
 }
 

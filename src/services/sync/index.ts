@@ -1,4 +1,4 @@
-import type { GameEvent, GameState, PlayerId, PointsTier, Subtask, Task } from '../../types'
+import type { GameEvent, GameState, PlayerId, Recurrence, Subtask, Task } from '../../types'
 import { createLocalSync } from './localSync'
 import { createSupabaseSync } from './supabaseSync'
 
@@ -10,10 +10,15 @@ export interface NewTaskInput {
   owner: PlayerId
   title: string
   category: string
-  points: PointsTier
+  points: number
+  order?: number
   dueDate?: string
   notes?: string
   subtasks?: string[]
+  isGoal?: boolean
+  targetMonth?: string
+  parentId?: string
+  recurrence?: Recurrence
   seeded?: boolean
 }
 
@@ -24,17 +29,33 @@ export interface SyncProvider {
   subscribe(cb: (state: GameState) => void): () => void
 
   addTask(input: NewTaskInput): Task
+  /** Add many tasks in one persist/broadcast (bulk importer). */
+  bulkAddTasks(inputs: NewTaskInput[]): Task[]
   updateTask(id: string, patch: Partial<Omit<Task, 'id' | 'owner'>>): void
   completeTask(id: string): void
   reopenTask(id: string): void
   deleteTask(id: string): void
   toggleSubtask(taskId: string, subtaskId: string): void
+  /** Persist a new urgency order for one owner's tasks. */
+  reorderTasks(owner: PlayerId, orderedIds: string[]): void
 
   /** Append a derived event (lead_change / milestone) computed by the caller. */
   appendEvent(event: GameEvent): void
 
   /** Replace all data (used by seed import / reset). */
   replaceAll(state: GameState): void
+}
+
+// ── Recurrence helper (shared by adapters) ────────────────────────────────────
+
+/** Advance an ISO date string by one recurrence step. */
+export function advanceDate(iso: string | undefined, rec: Recurrence): string | undefined {
+  if (!iso || rec === 'none' || !rec) return iso
+  const d = new Date(iso + 'T00:00:00')
+  if (rec === 'daily') d.setDate(d.getDate() + 1)
+  else if (rec === 'weekly') d.setDate(d.getDate() + 7)
+  else if (rec === 'monthly') d.setMonth(d.getMonth() + 1)
+  return d.toISOString().slice(0, 10)
 }
 
 // ── Shared helpers ────────────────────────────────────────────────────────────

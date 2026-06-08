@@ -8,7 +8,7 @@ import {
   useState,
   type ReactNode,
 } from 'react'
-import type { Board, GameEvent, GameState, Period, PlayerId } from '../types'
+import type { Board, GameEvent, GameState, Period, PlayerId, Task } from '../types'
 import { PERIODS, PLAYERS } from '../types'
 import { computeAllBoards } from '../services/scoring'
 import { getSync, uid, type NewTaskInput } from '../services/sync'
@@ -23,11 +23,13 @@ interface GameContextValue {
   currentPlayer: PlayerId | null
   setCurrentPlayer: (id: PlayerId | null) => void
   addTask: (input: NewTaskInput) => void
+  bulkAddTasks: (inputs: NewTaskInput[]) => void
   updateTask: (id: string, patch: Parameters<ReturnType<typeof getSync>['updateTask']>[1]) => void
   completeTask: (id: string) => void
   reopenTask: (id: string) => void
   deleteTask: (id: string) => void
   toggleSubtask: (taskId: string, subtaskId: string) => void
+  reorderTasks: (owner: PlayerId, orderedIds: string[]) => void
   replaceAll: (state: GameState) => void
 }
 
@@ -60,14 +62,56 @@ export function GameProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const addTask = useCallback((input: NewTaskInput) => sync.addTask(input), [sync])
+  const bulkAddTasks = useCallback((inputs: NewTaskInput[]) => sync.bulkAddTasks(inputs), [sync])
+
+  // updateTask emits an audit event (edited / point_change) so the activity log
+  // captures every change a player makes.
   const updateTask = useCallback<GameContextValue['updateTask']>(
-    (id, patch) => sync.updateTask(id, patch),
+    (id, patch) => {
+      const before = sync.getState().tasks.find((t: Task) => t.id === id)
+      sync.updateTask(id, patch)
+      if (!before) return
+      const after = sync.getState().tasks.find((t: Task) => t.id === id)
+      if (!after) return
+      if (patch.points != null && patch.points !== before.points) {
+        sync.appendEvent({
+          id: uid(),
+          type: 'point_change',
+          playerId: before.owner,
+          taskId: id,
+          taskTitle: after.title,
+          points: after.points,
+          message: `re-scored "${after.title}" ${before.points} → ${after.points}`,
+          ts: Date.now(),
+        })
+      } else {
+        const changedTitle = patch.title != null && patch.title !== before.title
+        const changedFields = Object.keys(patch).filter((k) => k !== 'points')
+        if (changedFields.length) {
+          sync.appendEvent({
+            id: uid(),
+            type: 'edited',
+            playerId: before.owner,
+            taskId: id,
+            taskTitle: after.title,
+            message: changedTitle
+              ? `renamed "${before.title}" → "${after.title}"`
+              : `edited "${after.title}"`,
+            ts: Date.now(),
+          })
+        }
+      }
+    },
     [sync],
   )
   const reopenTask = useCallback((id: string) => sync.reopenTask(id), [sync])
   const deleteTask = useCallback((id: string) => sync.deleteTask(id), [sync])
   const toggleSubtask = useCallback(
     (taskId: string, subtaskId: string) => sync.toggleSubtask(taskId, subtaskId),
+    [sync],
+  )
+  const reorderTasks = useCallback(
+    (owner: PlayerId, orderedIds: string[]) => sync.reorderTasks(owner, orderedIds),
     [sync],
   )
   const replaceAll = useCallback((s: GameState) => sync.replaceAll(s), [sync])
@@ -105,8 +149,9 @@ export function GameProvider({ children }: { children: ReactNode }) {
         }
       }
 
-      // Milestone: completing an Epic (10-pt) task.
-      if (task.points >= 10) {
+      // Milestone: completing a Major+ task (8–10 pts).
+      if (task.points >= 8) {
+        const tier = task.points >= 10 ? 'EPIC' : 'MAJOR'
         derived.push({
           id: uid(),
           type: 'milestone',
@@ -114,7 +159,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
           taskId: task.id,
           taskTitle: task.title,
           points: task.points,
-          message: `${PLAYERS[task.owner].name} crushed an EPIC: "${task.title}" (+10)`,
+          message: `${PLAYERS[task.owner].name} crushed a ${tier}: "${task.title}" (+${task.points})`,
           ts: Date.now(),
         })
       }
@@ -139,11 +184,13 @@ export function GameProvider({ children }: { children: ReactNode }) {
     currentPlayer,
     setCurrentPlayer,
     addTask,
+    bulkAddTasks,
     updateTask,
     completeTask,
     reopenTask,
     deleteTask,
     toggleSubtask,
+    reorderTasks,
     replaceAll,
   }
 

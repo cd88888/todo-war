@@ -23,6 +23,11 @@ export default {
         },
         win: '#39FF14',
         warn: '#FFB800',
+        gold: {
+          DEFAULT: '#FFC53D',
+          soft: '#ffe08a',
+          deep: '#b8860b',
+        },
       },
       fontFamily: {
         display: ['Orbitron', 'system-ui', 'sans-serif'],

@@ -1,6 +1,6 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
-import type { GameEvent, GameState, Task } from '../../types'
-import { makeSubtasks, uid, type NewTaskInput, type SyncProvider } from './index'
+import type { GameEvent, GameState, PlayerId, Task } from '../../types'
+import { advanceDate, makeSubtasks, uid, type NewTaskInput, type SyncProvider } from './index'
 
 // ── Supabase adapter (activated on deploy when env vars are set) ───────────────
 //
@@ -83,6 +83,30 @@ export function createSupabaseSync(url: string, key: string): SyncProvider {
   function pushEvent(ev: GameEvent) {
     state = { ...state, events: trim([...state.events, ev]) }
   }
+  function nextOrder(owner: PlayerId): number {
+    const orders = state.tasks.filter((t) => t.owner === owner).map((t) => t.order ?? 0)
+    return (orders.length ? Math.max(...orders) : 0) + 1
+  }
+  function buildTask(input: NewTaskInput, order: number): Task {
+    return {
+      id: uid(),
+      owner: input.owner,
+      title: input.title.trim(),
+      category: input.category.trim() || 'General',
+      points: Math.max(1, Math.min(10, Math.round(input.points))),
+      order: input.order ?? order,
+      dueDate: input.dueDate || undefined,
+      notes: input.notes?.trim() || undefined,
+      subtasks: makeSubtasks(input.subtasks),
+      status: 'open',
+      createdAt: Date.now(),
+      isGoal: input.isGoal || undefined,
+      targetMonth: input.targetMonth || undefined,
+      parentId: input.parentId || undefined,
+      recurrence: input.recurrence && input.recurrence !== 'none' ? input.recurrence : undefined,
+      seeded: input.seeded,
+    }
+  }
 
   return {
     getState: () => state,
@@ -94,19 +118,7 @@ export function createSupabaseSync(url: string, key: string): SyncProvider {
     },
 
     addTask(input: NewTaskInput): Task {
-      const task: Task = {
-        id: uid(),
-        owner: input.owner,
-        title: input.title.trim(),
-        category: input.category.trim() || 'General',
-        points: input.points,
-        dueDate: input.dueDate || undefined,
-        notes: input.notes?.trim() || undefined,
-        subtasks: makeSubtasks(input.subtasks),
-        status: 'open',
-        createdAt: Date.now(),
-        seeded: input.seeded,
-      }
+      const task = buildTask(input, nextOrder(input.owner))
       state = { ...state, tasks: [...state.tasks, task] }
       pushEvent({
         id: uid(),
@@ -120,6 +132,39 @@ export function createSupabaseSync(url: string, key: string): SyncProvider {
       })
       void flush()
       return task
+    },
+
+    bulkAddTasks(inputs: NewTaskInput[]): Task[] {
+      const created: Task[] = []
+      const baseOrder: Record<PlayerId, number> = { cam: nextOrder('cam'), arthur: nextOrder('arthur') }
+      for (const input of inputs) {
+        const task = buildTask(input, baseOrder[input.owner]++)
+        created.push(task)
+        state = { ...state, tasks: [...state.tasks, task] }
+        pushEvent({
+          id: uid(),
+          type: 'created',
+          playerId: task.owner,
+          taskId: task.id,
+          taskTitle: task.title,
+          points: task.points,
+          message: `added "${task.title}" (${task.points} pts)`,
+          ts: task.createdAt,
+        })
+      }
+      void flush()
+      return created
+    },
+
+    reorderTasks(owner, orderedIds) {
+      const indexById = new Map(orderedIds.map((id, i) => [id, i + 1]))
+      state = {
+        ...state,
+        tasks: state.tasks.map((t) =>
+          t.owner === owner && indexById.has(t.id) ? { ...t, order: indexById.get(t.id)! } : t,
+        ),
+      }
+      void flush()
     },
 
     updateTask(id, patch) {
@@ -144,6 +189,19 @@ export function createSupabaseSync(url: string, key: string): SyncProvider {
         message: `completed "${t.title}" +${t.points}`,
         ts: now,
       })
+      if (t.recurrence && t.recurrence !== 'none') {
+        const spawn: Task = {
+          ...t,
+          id: uid(),
+          status: 'open',
+          completedAt: undefined,
+          createdAt: now,
+          order: nextOrder(t.owner),
+          dueDate: advanceDate(t.dueDate, t.recurrence),
+          subtasks: t.subtasks.map((s) => ({ ...s, id: uid(), done: false })),
+        }
+        state = { ...state, tasks: [...state.tasks, spawn] }
+      }
       void flush()
     },
 

@@ -1,19 +1,23 @@
-import type { GameEvent, GameState, PlayerId, PointsTier, Task } from '../types'
+import type { GameEvent, GameState, PlayerId, Recurrence, Task } from '../types'
 import { PLAYERS } from '../types'
 import { uid } from './sync'
 
-// Best-effort transcription of the whiteboard photo (IMG_4576). Crossed-out items
-// are seeded as done. Points/categories are sensible guesses — fully editable in-app.
+// Best-effort transcription of the whiteboard photo (IMG_4576) plus the tasks Cam &
+// Arthur dictated. Everything starts open (0–0). Points use the 1–10 rubric and are
+// fully editable in-app.
 
 interface SeedRow {
   title: string
   category: string
-  points: PointsTier
+  points: number // 1–10
   done: boolean
   /** how many days ago it was completed (only for done items) */
   daysAgo?: number
   subtasks?: string[]
   notes?: string
+  recurrence?: Recurrence
+  isGoal?: boolean
+  targetMonth?: string
 }
 
 const CAM: SeedRow[] = [
@@ -66,6 +70,7 @@ const CAM: SeedRow[] = [
 ]
 
 const ARTHUR: SeedRow[] = [
+  { title: 'Email tenants — renew leases or list on market', category: 'Ops', points: 4, done: false, recurrence: 'weekly' },
   { title: 'Hire dry cleaning expert', category: 'Ops', points: 3, done: false },
   { title: 'Commitment letter completed', category: 'Deals', points: 5, done: false },
   { title: 'Purchase agreement signed', category: 'Deals', points: 10, done: false },
@@ -98,12 +103,16 @@ function buildTasks(rows: SeedRow[], owner: PlayerId, now: number): { tasks: Tas
       owner,
       title: r.title,
       category: r.category,
-      points: r.points,
+      points: Math.max(1, Math.min(10, r.points)),
+      order: i + 1,
       notes: r.notes,
       subtasks: (r.subtasks ?? []).map((t) => ({ id: uid(), title: t, done: false })),
       status: r.done ? 'done' : 'open',
       createdAt,
       completedAt,
+      recurrence: r.recurrence && r.recurrence !== 'none' ? r.recurrence : undefined,
+      isGoal: r.isGoal || undefined,
+      targetMonth: r.targetMonth || undefined,
       seeded: true,
     }
     tasks.push(task)
