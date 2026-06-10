@@ -50,13 +50,43 @@ function parseLine(raw: string, state: ReturnType<typeof useGame>['state']): Par
   return { title, category: cat, points: pts, recurrence, urgency, isGoal }
 }
 
+// Turn a free-form brain-dump (paragraphs, numbered lists, bullets, "and then…")
+// into one candidate task per line. The live preview lets you sanity-check the split.
+function splitIntoTaskLines(raw: string): string[] {
+  return raw
+    .replace(/\r/g, '\n')
+    // strip filler preamble dictation often starts with ("OK so I need to …")
+    .replace(/^\s*(?:(?:ok|okay|so|alright|well|um+|uh+|i need to|i gotta|i have to|i want to|i should)[\s,]+)+/i, '')
+    // break before inline numbered markers:  "1. " "2) " "3:"
+    .replace(/\s+(?=\d{1,2}[.):]\s)/g, '\n')
+    // bullets → newline
+    .replace(/[•▪◦●]\s*/g, '\n')
+    // strong separators → newline
+    .replace(/;\s*/g, '\n')
+    // run-on dictation joiners → newline
+    .replace(/\s*,?\s*\b(?:and then|then|after that|next|also|plus)\b\s+/gi, '\n')
+    // remaining commas and standalone "and" between clauses → newline
+    .replace(/\s*,\s*and\s+/gi, '\n')
+    .replace(/\s*,\s+/g, '\n')
+    .replace(/\s+and\s+/gi, '\n')
+    .split('\n')
+    .map((s) =>
+      s
+        // strip leading list markers: "1." "2)" "- " "* " "•"
+        .replace(/^\s*(?:\d{1,2}[.):]|[-–—*•])\s*/, '')
+        // tidy trailing period / "asap" noise stays; just trim
+        .trim(),
+    )
+    .filter((s) => s.length >= 2)
+}
+
 export default function BulkAddModal({ owner, onClose }: Props) {
   const { state, bulkAddTasks } = useGame()
   const [text, setText] = useState('')
   const accent = owner === 'cam' ? '#00E5FF' : '#FF2BD6'
 
   const rows = useMemo(
-    () => text.split('\n').map((l) => parseLine(l, state)).filter(Boolean) as ParsedRow[],
+    () => splitIntoTaskLines(text).map((l) => parseLine(l, state)).filter(Boolean) as ParsedRow[],
     [text, state],
   )
 
@@ -85,16 +115,16 @@ export default function BulkAddModal({ owner, onClose }: Props) {
         </div>
 
         <p className="text-xs text-slate-400 mb-2 flex items-center gap-1.5">
-          <Sparkles size={12} /> One task per line. Dictate a whole list with Wispr Flow and paste it.
+          <Sparkles size={12} /> Dump a brain-dump or dictate a whole list — I'll split it into tasks. Numbered lists, bullets, semicolons, and "…and then…" all work.
         </p>
         <div className="text-[10px] text-slate-500 mb-2 font-mono bg-ink-800 rounded-lg px-3 py-2">
-          Optional tags: <span className="text-slate-300">#Category</span> · <span className="text-slate-300">p7</span> (points) · <span className="text-slate-300">!weekly</span> (repeat) · <span className="text-slate-300">*2</span> (urgency) · <span className="text-slate-300">@goal</span>
+          Optional tags anywhere: <span className="text-slate-300">#Category</span> · <span className="text-slate-300">p7</span> (points) · <span className="text-slate-300">!weekly</span> (repeat) · <span className="text-slate-300">*2</span> (urgency) · <span className="text-slate-300">@goal</span>
         </div>
 
         <textarea
           autoFocus value={text} onChange={(e) => setText(e.target.value)} rows={8}
-          placeholder={`Email tenants about renewals #Ops !weekly *1\nSend lender all requested docs p9 *1\nClose the NJ deal #Deals p10\nRaise seed round @goal p10\nPay physical therapy #General p1`}
-          className="w-full bg-ink-800 border border-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:border-white/30 resize-y font-mono leading-relaxed placeholder:text-slate-600"
+          placeholder={`Paste or dictate anything, e.g.:\n\nOK so I need to email all the tenants about renewals every week, then set up the LinkedIn campaign for SBL, close the NJ deal it's huge, send the lender all their docs asap, and pay physical therapy.\n\n— or a clean list —\n1. Email campaign to sellers #Sales\n2. Kodiak closing MSA #Deals p9\n3. Raise seed round @goal p10`}
+          className="w-full bg-ink-800 border border-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:border-white/30 resize-y leading-relaxed placeholder:text-slate-600"
         />
 
         {rows.length > 0 && (
